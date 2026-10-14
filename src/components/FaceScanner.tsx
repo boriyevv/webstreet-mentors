@@ -65,4 +65,4 @@ return () => {
 };
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
-return ( <div className="flex flex-col items-center"> <div className={relative h-72 w-72 overflow-hidden rounded-full border-4 ${phase === 'find' ? 'border-brand-600 pulse-ring' : 'border-ink-200'}}> <video ref={video} playsInline muted className="h-full w-full -scale-x-100 object-cover" /> {phase === 'load' && <div className="absolute inset-0 flex items-center justify-center bg-white/80 text-brand-600"><Loader2 className="spin" size={28} /></div>} </div> <p className="mt-6 min-h-[1.5rem] text-center text-sm font-medium text-ink-700" aria-live="polite">{msg}</p> </div> ); }
+return ( <div className={'relative h-72 w-72 overflow-hidden rounded-full border-4 ' + (phase === 'find' ? 'border-brand-600 pulse-ring' : 'border-ink-200')}> ); }
