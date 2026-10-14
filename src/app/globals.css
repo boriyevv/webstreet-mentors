@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+html, body { background: #fff; color: #0b1220; -webkit-tap-highlight-color: transparent; }
+body { font-feature-settings: 'cv11', 'ss01'; letter-spacing: -0.005em; }
+input, select, button, textarea { font: inherit; }
+:focus-visible { outline: 2px solid #0a5cff; outline-offset: 2px; }
+.safe-b { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.8s linear infinite; }
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(10,92,255,.35); } 100% { box-shadow: 0 0 0 18px rgba(10,92,255,0); } }
+.pulse-ring { animation: pulse-ring 1.6s ease-out infinite; }

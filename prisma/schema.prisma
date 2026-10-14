@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String       @id @default(cuid())
+  role           String       @default("TEACHER")
+  login          String       @unique
+  passwordHash   String
+  fullName       String
+  phone          String       @default("")
+  photo          String?
+  faceDescriptor String?
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  groups         Group[]
+  attendances    Attendance[]
+}
+
+model Group {
+  id          String       @id @default(cuid())
+  name        String
+  teacherId   String
+  room        String
+  days        String
+  startTime   String
+  endTime     String
+  startDate   String
+  endDate     String?
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  teacher     User         @relation(fields: [teacherId], references: [id])
+  attendances Attendance[]
+}
+
+model Attendance {
+  id          String    @id @default(cuid())
+  teacherId   String
+  groupId     String
+  date        String
+  checkInAt   DateTime?
+  checkOutAt  DateTime?
+  status      String    @default("ON_TIME")
+  lateMinutes Int       @default(0)
+  earlyLeave  Boolean   @default(false)
+  inLat       Float?
+  inLng       Float?
+  inDistance  Float?
+  inFace      Float?
+  inSnap      String?
+  outLat      Float?
+  outLng      Float?
+  outDistance Float?
+  outFace     Float?
+  outSnap     String?
+  createdAt   DateTime  @default(now())
+  teacher     User      @relation(fields: [teacherId], references: [id])
+  group       Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, date])
+  @@index([teacherId, date])
+}
+
+model Setting {
+  key   String @id
+  value String
+}
