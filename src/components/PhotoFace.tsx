@@ -1,48 +1,68 @@
-'use client';
-import { useRef, useState } from 'react';
-import { Camera, CheckCircle2, Loader2, ScanFace } from 'lucide-react';
-import { Avatar } from './ui';
-import { descriptorFromDataUrl, resizeImage } from '@/lib/face';
+'use client'; import { useEffect, useRef, useState } from 'react'; import { Loader2 } from 'lucide-react'; import { detectorOptions, loadFace } from '@/lib/face';
+type Result = { descriptor: number[]; snap: string };
+export function FaceScanner({ onCapture, onError }: { onCapture: (r: Result) => void; onError: (m: string) => void }) { const video = useRef<HTMLVideoElement>(null); const [msg, setMsg] = useState('Kamera yoqilmoqda…'); const [phase, setPhase] = useState<'load' | 'find' | 'done'>('load');
+useEffect(() => { let stop = false; let stream: MediaStream | null = null; let timer: any;
+(async () => {
+  try {
+    const [f, s] = await Promise.all([
+      loadFace(),
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false }),
+    ]);
+    stream = s;
+    if (stop) { s.getTracks().forEach((t) => t.stop()); return; }
+    const v = video.current!;
+    v.srcObject = s;
+    await v.play();
+    setPhase('find');
+    setMsg('Yuzingizni doira ichiga joylang');
 
-export type PhotoValue = { photo: string | null; descriptor: number[] | null };
+    let good = 0;
+    const t0 = Date.now();
 
-export function PhotoFace({ value, current, onChange }: { value: PhotoValue; current?: string | null; onChange: (v: PhotoValue) => void }) {
-  const ref = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-
-  async function pick(f?: File) {
-    if (!f) return;
-    setErr(''); setBusy(true);
-    try {
-      const photo = await resizeImage(f, 400);
-      const descriptor = await descriptorFromDataUrl(photo);
-      onChange({ photo, descriptor });
-    } catch (e: any) {
-      onChange({ photo: null, descriptor: null });
-      setErr(e.message || 'Rasmni tekshirib bo\'lmadi');
-    } finally {
-      setBusy(false);
-      if (ref.current) ref.current.value = '';
-    }
+    const loop = async () => {
+      if (stop) return;
+      try {
+        const det = await f.detectSingleFace(v, detectorOptions(f)).withFaceLandmarks().withFaceDescriptor();
+        if (det && det.detection.score > 0.6) {
+          const w = det.detection.box.width / v.videoWidth;
+          if (w < 0.22) {
+            good = 0;
+            setMsg('Yaqinroq keling');
+          } else {
+            good++;
+            setMsg('Qimirlamang…');
+            if (good >= 3) {
+              const c = document.createElement('canvas');
+              const k = 200 / v.videoWidth;
+              c.width = 200;
+              c.height = Math.round(v.videoHeight * k);
+              c.getContext('2d')!.drawImage(v, 0, 0, c.width, c.height);
+              setPhase('done');
+              s.getTracks().forEach((t) => t.stop());
+              onCapture({ descriptor: Array.from(det.descriptor as Float32Array), snap: c.toDataURL('image/jpeg', 0.7) });
+              return;
+            }
+          }
+        } else {
+          good = 0;
+          setMsg("Yuz topilmadi. Yorug'roq joyda kameraga qarang");
+        }
+        if (Date.now() - t0 > 30000) { onError("Vaqt tugadi. Yuzingiz yorug' joyda ko'rinib tursin va qayta urinib ko'ring."); return; }
+      } catch {}
+      timer = setTimeout(loop, 100);
+    };
+    loop();
+  } catch (e: any) {
+    const name = e?.name || '';
+    onError(name === 'NotAllowedError' ? 'Kameraga ruxsat berilmagan. Brauzer sozlamalarida kameraga ruxsat bering.' : name === 'NotFoundError' ? 'Kamera topilmadi' : e?.message || "Kamerani ochib bo'lmadi");
   }
-  const shown = value.photo || current || null;
-  return (
-    <div>
-      <span className="mb-1.5 block text-sm font-medium text-ink-700">Rasm (yuz tasdiqlash uchun)</span>
-      <div className="flex items-center gap-4 rounded-xl border border-dashed border-ink-300 p-3">
-        {shown ? <Avatar src={shown} name="Rasm" size={72} /> : <span className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-ink-100 text-ink-500"><ScanFace size={28} /></span>}
-        <div className="min-w-0 flex-1">
-          <button type="button" onClick={() => ref.current?.click()} disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100">
-            {busy ? <Loader2 size={16} className="spin" /> : <Camera size={16} />} {shown ? "Rasmni almashtirish" : 'Rasm tanlash'}
-          </button>
-          {busy && <p className="mt-2 text-xs text-ink-500">Yuz aniqlanmoqda…</p>}
-          {!busy && value.descriptor && <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-700"><CheckCircle2 size={14} /> Yuz aniqlandi</p>}
-          {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
-          {!busy && !err && !value.descriptor && <p className="mt-2 text-xs text-ink-500">Yuzi aniq ko'ringan, yorug' joyda olingan, yolg'iz rasm.</p>}
-        </div>
-      </div>
-      <input ref={ref} type="file" accept="image/*" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
-    </div>
-  );
-}
+})();
+
+return () => {
+  stop = true;
+  clearTimeout(timer);
+  stream?.getTracks().forEach((t) => t.stop());
+};
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+return ( <div className="flex flex-col items-center"> <div className={relative h-72 w-72 overflow-hidden rounded-full border-4 ${phase === 'find' ? 'border-brand-600 pulse-ring' : 'border-ink-200'}}> <video ref={video} playsInline muted className="h-full w-full -scale-x-100 object-cover" /> {phase === 'load' && <div className="absolute inset-0 flex items-center justify-center bg-white/80 text-brand-600"><Loader2 className="spin" size={28} /></div>} </div> <p className="mt-6 min-h-[1.5rem] text-center text-sm font-medium text-ink-700" aria-live="polite">{msg}</p> </div> ); }
